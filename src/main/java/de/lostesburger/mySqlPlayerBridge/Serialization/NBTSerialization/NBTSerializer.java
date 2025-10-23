@@ -10,6 +10,8 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.Base64;
 import java.util.logging.Level;
+import java.util.zip.GZIPInputStream;
+import java.util.zip.GZIPOutputStream;
 
 public class NBTSerializer {
 
@@ -71,6 +73,7 @@ public class NBTSerializer {
 
     /**
      * 序列化为标准 NBT 二进制格式（第一种格式）
+     * 使用 GZIP 压缩以符合 Minecraft 标准格式
      */
     public String serialize(ItemStack[] items) throws Exception {
         try {
@@ -86,24 +89,34 @@ public class NBTSerializer {
             }
 
             // 2. 将 NBT 对象写入字节流（二进制格式）
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            writeCompoundMethod.invoke(nbtCompound, outputStream);
+            ByteArrayOutputStream rawOutputStream = new ByteArrayOutputStream();
+            writeCompoundMethod.invoke(nbtCompound, rawOutputStream);
+            byte[] rawNbtBytes = rawOutputStream.toByteArray();
 
-            // 3. Base64 编码
-            byte[] nbtBytes = outputStream.toByteArray();
+            // 日志：原始 NBT 数据大小
+            Main.getInstance().getLogger().fine("原始 NBT 二进制数据大小: " + rawNbtBytes.length + " 字节");
 
-            // 日志：输出数据大小
-            Main.getInstance().getLogger().fine("NBT 二进制数据大小: " + nbtBytes.length + " 字节");
-
-            if (nbtBytes.length == 0) {
-                Main.getInstance().getLogger().warning("NBT 二进制数据为空！");
+            // 3. 使用 GZIP 压缩 NBT 数据（符合 Minecraft 标准格式）
+            ByteArrayOutputStream compressedOutputStream = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(compressedOutputStream)) {
+                gzipOutputStream.write(rawNbtBytes);
+                gzipOutputStream.finish();
             }
 
-            String base64 = Base64.getEncoder().encodeToString(nbtBytes);
+            byte[] compressedBytes = compressedOutputStream.toByteArray();
+            Main.getInstance().getLogger().fine("GZIP 压缩后数据大小: " + compressedBytes.length + " 字节");
+
+            // 4. Base64 编码
+            String base64 = Base64.getEncoder().encodeToString(compressedBytes);
 
             // 日志：Base64 前缀（用于验证格式）
             String prefix = base64.length() > 20 ? base64.substring(0, 20) : base64;
             Main.getInstance().getLogger().fine("Base64 编码完成，前缀: " + prefix + "...");
+
+            // 验证：GZIP 压缩的 Base64 通常以 "H4sI" 开头
+            if (base64.startsWith("H4sI")) {
+                Main.getInstance().getLogger().fine("✓ 数据格式正确：GZIP 压缩的 NBT Base64");
+            }
 
             return base64;
 
@@ -115,6 +128,7 @@ public class NBTSerializer {
 
     /**
      * 从标准 NBT 二进制格式反序列化（第一种格式）
+     * 支持 GZIP 压缩的数据（Minecraft 标准格式）
      */
     public ItemStack[] deserialize(String base64) throws Exception {
         try {
@@ -130,8 +144,36 @@ public class NBTSerializer {
             Main.getInstance().getLogger().fine("Base64 总长度: " + base64.length());
 
             // 1. Base64 解码
-            byte[] nbtBytes = Base64.getDecoder().decode(base64);
-            Main.getInstance().getLogger().fine("Base64 解码成功，字节数: " + nbtBytes.length);
+            byte[] compressedBytes = Base64.getDecoder().decode(base64);
+            Main.getInstance().getLogger().fine("Base64 解码成功，字节数: " + compressedBytes.length);
+
+            // 检查是否为 GZIP 压缩数据（魔数：0x1F 0x8B）
+            boolean isGzipCompressed = compressedBytes.length >= 2 &&
+                    (compressedBytes[0] & 0xFF) == 0x1F &&
+                    (compressedBytes[1] & 0xFF) == 0x8B;
+
+            byte[] nbtBytes;
+
+            if (isGzipCompressed) {
+                Main.getInstance().getLogger().fine("检测到 GZIP 压缩数据，开始解压缩...");
+
+                // 2. GZIP 解压缩
+                ByteArrayOutputStream decompressedOutputStream = new ByteArrayOutputStream();
+                try (GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(compressedBytes))) {
+                    byte[] buffer = new byte[1024];
+                    int len;
+                    while ((len = gzipInputStream.read(buffer)) > 0) {
+                        decompressedOutputStream.write(buffer, 0, len);
+                    }
+                }
+                nbtBytes = decompressedOutputStream.toByteArray();
+                Main.getInstance().getLogger().fine("GZIP 解压缩成功，解压后字节数: " + nbtBytes.length);
+
+            } else {
+                // 未压缩的 NBT 数据（向后兼容）
+                Main.getInstance().getLogger().fine("检测到未压缩的 NBT 数据");
+                nbtBytes = compressedBytes;
+            }
 
             // 检查字节数组前几个字节（NBT 标签）
             if (nbtBytes.length > 0) {
@@ -142,7 +184,7 @@ public class NBTSerializer {
                 Main.getInstance().getLogger().fine(hex.toString());
             }
 
-            // 2. 从字节流读取 NBT 对象
+            // 3. 从字节流读取 NBT 对象
             ByteArrayInputStream inputStream = new ByteArrayInputStream(nbtBytes);
             Object nbtContainer = nbtContainerConstructor.newInstance(inputStream);
             Main.getInstance().getLogger().fine("NBT Container 创建成功");
@@ -152,7 +194,7 @@ public class NBTSerializer {
                 throw new IllegalStateException("NBT Container is null");
             }
 
-            // 3. 将 NBT 对象转换为 ItemStack 数组
+            // 4. 将 NBT 对象转换为 ItemStack 数组
             Object items = convertNBTToItemArray.invoke(null, nbtContainer);
             Main.getInstance().getLogger().fine("NBT 转换为 ItemStack 数组成功");
 
@@ -183,6 +225,7 @@ public class NBTSerializer {
 
     /**
      * 序列化单个物品
+     * 使用 GZIP 压缩
      */
     public String serializeSingleItem(ItemStack item) throws Exception {
         if (item == null) {
@@ -208,10 +251,18 @@ public class NBTSerializer {
             Object compound = getCompoundMethod.invoke(nbtItem);
 
             // 写入二进制
-            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
-            writeCompoundMethod.invoke(compound, outputStream);
+            ByteArrayOutputStream rawOutputStream = new ByteArrayOutputStream();
+            writeCompoundMethod.invoke(compound, rawOutputStream);
+            byte[] rawBytes = rawOutputStream.toByteArray();
 
-            return Base64.getEncoder().encodeToString(outputStream.toByteArray());
+            // GZIP 压缩
+            ByteArrayOutputStream compressedOutputStream = new ByteArrayOutputStream();
+            try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(compressedOutputStream)) {
+                gzipOutputStream.write(rawBytes);
+                gzipOutputStream.finish();
+            }
+
+            return Base64.getEncoder().encodeToString(compressedOutputStream.toByteArray());
 
         } catch (Exception e) {
             Main.getInstance().getLogger().log(Level.SEVERE, "序列化单个物品失败", e);
@@ -221,6 +272,7 @@ public class NBTSerializer {
 
     /**
      * 反序列化单个物品
+     * 支持 GZIP 压缩的数据
      */
     public ItemStack deserializeSingleItem(String base64) throws Exception {
         if (base64 == null || base64.isEmpty()) {
@@ -237,8 +289,32 @@ public class NBTSerializer {
                 nbtItemClass = Class.forName("de.tr7zw.nbtapi.NBTItem", true, classLoader);
             }
 
+            // Base64 解码
+            byte[] compressedBytes = Base64.getDecoder().decode(base64);
+
+            // 检查是否为 GZIP 压缩
+            boolean isGzipCompressed = compressedBytes.length >= 2 &&
+                    (compressedBytes[0] & 0xFF) == 0x1F &&
+                    (compressedBytes[1] & 0xFF) == 0x8B;
+
+            byte[] nbtBytes;
+
+            if (isGzipCompressed) {
+                // GZIP 解压缩
+                ByteArrayOutputStream decompressedOutputStream = new ByteArrayOutputStream();
+                try (GZIPInputStream gzipInputStream = new GZIPInputStream(new ByteArrayInputStream(compressedBytes))) {
+                    byte[] buffer = new byte[1024];
+                    int len;
+                    while ((len = gzipInputStream.read(buffer)) > 0) {
+                        decompressedOutputStream.write(buffer, 0, len);
+                    }
+                }
+                nbtBytes = decompressedOutputStream.toByteArray();
+            } else {
+                nbtBytes = compressedBytes;
+            }
+
             // 从二进制读取
-            byte[] nbtBytes = Base64.getDecoder().decode(base64);
             ByteArrayInputStream inputStream = new ByteArrayInputStream(nbtBytes);
             Object nbtContainer = nbtContainerConstructor.newInstance(inputStream);
 

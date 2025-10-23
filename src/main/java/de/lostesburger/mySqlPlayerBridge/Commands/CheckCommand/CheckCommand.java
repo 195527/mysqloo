@@ -5,7 +5,6 @@ import de.lostesburger.mySqlPlayerBridge.Database.DatabaseException;
 import de.lostesburger.mySqlPlayerBridge.Database.DatabaseManager;
 import de.lostesburger.mySqlPlayerBridge.Main;
 import de.lostesburger.mySqlPlayerBridge.Managers.MySqlData.MySqlDataManager;
-import de.lostesburger.mySqlPlayerBridge.Serialization.BukkitItemSerializer;
 import de.lostesburger.mySqlPlayerBridge.Utils.Chat;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
@@ -79,7 +78,7 @@ public class CheckCommand implements CommandInterface {
                 // 保存玩家当前数据到数据库，确保数据是最新的
                 Main.mySqlConnectionHandler.getMySqlDataManager().savePlayerData(onlinePlayer);
             }
-            
+
             if (!manager.entryExists(Main.INVENTORY_TABLE_NAME, Map.of("player_uuid", targetUUID.toString()))) {
                 commandSender.sendMessage("§c数据库中没有找到玩家 " + playerName + " (" + targetUUID + ") 的数据");
                 return;
@@ -87,43 +86,43 @@ public class CheckCommand implements CommandInterface {
 
             // 从所有表中获取玩家数据
             HashMap<String, Object> data = new HashMap<>();
-            
+
             // 从各个表中获取数据
             try {
                 HashMap<String, Object> inventoryData = (HashMap<String, Object>) manager.getEntry(Main.INVENTORY_TABLE_NAME, Map.of("player_uuid", targetUUID.toString()));
                 if (inventoryData != null) data.putAll(inventoryData);
             } catch (Exception ignored) {}
-            
+
             try {
                 HashMap<String, Object> enderchestData = (HashMap<String, Object>) manager.getEntry(Main.ENDERCHEST_TABLE_NAME, Map.of("player_uuid", targetUUID.toString()));
                 if (enderchestData != null) data.putAll(enderchestData);
             } catch (Exception ignored) {}
-            
+
             try {
                 HashMap<String, Object> economyData = (HashMap<String, Object>) manager.getEntry(Main.ECONOMY_TABLE_NAME, Map.of("player_uuid", targetUUID.toString()));
                 if (economyData != null) data.putAll(economyData);
             } catch (Exception ignored) {}
-            
+
             try {
                 HashMap<String, Object> experienceData = (HashMap<String, Object>) manager.getEntry(Main.EXPERIENCE_TABLE_NAME, Map.of("player_uuid", targetUUID.toString()));
                 if (experienceData != null) data.putAll(experienceData);
             } catch (Exception ignored) {}
-            
+
             try {
                 HashMap<String, Object> healthData = (HashMap<String, Object>) manager.getEntry(Main.HEALTH_FOOD_AIR_TABLE_NAME, Map.of("player_uuid", targetUUID.toString()));
                 if (healthData != null) data.putAll(healthData);
             } catch (Exception ignored) {}
-            
+
             try {
                 HashMap<String, Object> potionData = (HashMap<String, Object>) manager.getEntry(Main.POTION_EFFECTS_TABLE_NAME, Map.of("player_uuid", targetUUID.toString()));
                 if (potionData != null) data.putAll(potionData);
             } catch (Exception ignored) {}
-            
+
             // 显示玩家信息
             commandSender.sendMessage("§7======== §9玩家数据检查 §7========");
             commandSender.sendMessage("§7玩家名: §f" + playerName);
             commandSender.sendMessage("§7UUID: §f" + targetUUID);
-            
+
             // 显示金币（如果启用）
             if (Main.modulesManager.syncVaultEconomy) {
                 Object money = data.get("money");
@@ -131,37 +130,38 @@ public class CheckCommand implements CommandInterface {
             } else {
                 commandSender.sendMessage("§7金币: §f未启用经济同步");
             }
-            
+
             // 显示背包信息
             Object inventoryData = data.get("inventory");
             if (inventoryData != null) {
                 try {
-                    ItemStack[] inventoryContents = BukkitItemSerializer.deserialize(inventoryData.toString());
-                    Map<String, Integer> itemCounts = new HashMap<>();
-                    Map<String, ItemStack> itemExamples = new HashMap<>();
-                    int totalItems = 0;
+                    // 使用NBT反序列化
+                    if (Main.nbtSerializer == null) {
+                        commandSender.sendMessage("§7背包物品: §c无法解析 (NBT序列化器未初始化)");
+                    } else {
+                        ItemStack[] inventoryContents = Main.nbtSerializer.deserialize(inventoryData.toString());
+                        Map<String, Integer> itemCounts = new HashMap<>();
+                        int totalItems = 0;
 
-                    if (inventoryContents != null) {
-                        for (ItemStack item : inventoryContents) {
-                            if (item != null && item.getAmount() > 0) {
-                                String itemKey = item.getType().toString();
-                                itemCounts.put(itemKey, itemCounts.getOrDefault(itemKey, 0) + item.getAmount());
-                                if (!itemExamples.containsKey(itemKey)) {
-                                    itemExamples.put(itemKey, item);
+                        if (inventoryContents != null) {
+                            for (ItemStack item : inventoryContents) {
+                                if (item != null && item.getAmount() > 0) {
+                                    String itemKey = item.getType().toString();
+                                    itemCounts.put(itemKey, itemCounts.getOrDefault(itemKey, 0) + item.getAmount());
+                                    totalItems += item.getAmount();
                                 }
-                                totalItems += item.getAmount();
                             }
                         }
-                    }
 
-                    if (totalItems > 0) {
-                        commandSender.sendMessage("§7背包物品: §f共 " + totalItems + " 个物品");
-                        for (Map.Entry<String, Integer> entry : itemCounts.entrySet()) {
-                            String chineseName = Main.itemTranslationManager.getChineseName(entry.getKey());
-                            commandSender.sendMessage("§7  - §f" + chineseName + " §7x §f" + entry.getValue());
+                        if (totalItems > 0) {
+                            commandSender.sendMessage("§7背包物品: §f共 " + totalItems + " 个物品");
+                            for (Map.Entry<String, Integer> entry : itemCounts.entrySet()) {
+                                String chineseName = Main.itemTranslationManager.getChineseName(entry.getKey());
+                                commandSender.sendMessage("§7  - §f" + chineseName + " §7x §f" + entry.getValue());
+                            }
+                        } else {
+                            commandSender.sendMessage("§7背包物品: §f无");
                         }
-                    } else {
-                        commandSender.sendMessage("§7背包物品: §f无");
                     }
                 } catch (Exception e) {
                     commandSender.sendMessage("§7背包物品: §c无法解析 (" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")");
@@ -170,37 +170,38 @@ public class CheckCommand implements CommandInterface {
             } else {
                 commandSender.sendMessage("§7背包物品: §f无数据");
             }
-            
+
             // 显示末影箱信息
             Object enderChestData = data.get("enderchest");
             if (enderChestData != null) {
                 try {
-                    ItemStack[] enderChestContents = BukkitItemSerializer.deserialize(enderChestData.toString());
-                    Map<String, Integer> itemCounts = new HashMap<>();
-                    Map<String, ItemStack> itemExamples = new HashMap<>();
-                    int totalItems = 0;
+                    // 使用NBT反序列化
+                    if (Main.nbtSerializer == null) {
+                        commandSender.sendMessage("§7末影箱物品: §c无法解析 (NBT序列化器未初始化)");
+                    } else {
+                        ItemStack[] enderChestContents = Main.nbtSerializer.deserialize(enderChestData.toString());
+                        Map<String, Integer> itemCounts = new HashMap<>();
+                        int totalItems = 0;
 
-                    if (enderChestContents != null) {
-                        for (ItemStack item : enderChestContents) {
-                            if (item != null && item.getAmount() > 0) {
-                                String itemKey = item.getType().toString();
-                                itemCounts.put(itemKey, itemCounts.getOrDefault(itemKey, 0) + item.getAmount());
-                                if (!itemExamples.containsKey(itemKey)) {
-                                    itemExamples.put(itemKey, item);
+                        if (enderChestContents != null) {
+                            for (ItemStack item : enderChestContents) {
+                                if (item != null && item.getAmount() > 0) {
+                                    String itemKey = item.getType().toString();
+                                    itemCounts.put(itemKey, itemCounts.getOrDefault(itemKey, 0) + item.getAmount());
+                                    totalItems += item.getAmount();
                                 }
-                                totalItems += item.getAmount();
                             }
                         }
-                    }
 
-                    if (totalItems > 0) {
-                        commandSender.sendMessage("§7末影箱物品: §f共 " + totalItems + " 个物品");
-                        for (Map.Entry<String, Integer> entry : itemCounts.entrySet()) {
-                            String chineseName = Main.itemTranslationManager.getChineseName(entry.getKey());
-                            commandSender.sendMessage("§7  - §f" + chineseName + " §7x §f" + entry.getValue());
+                        if (totalItems > 0) {
+                            commandSender.sendMessage("§7末影箱物品: §f共 " + totalItems + " 个物品");
+                            for (Map.Entry<String, Integer> entry : itemCounts.entrySet()) {
+                                String chineseName = Main.itemTranslationManager.getChineseName(entry.getKey());
+                                commandSender.sendMessage("§7  - §f" + chineseName + " §7x §f" + entry.getValue());
+                            }
+                        } else {
+                            commandSender.sendMessage("§7末影箱物品: §f无");
                         }
-                    } else {
-                        commandSender.sendMessage("§7末影箱物品: §f无");
                     }
                 } catch (Exception e) {
                     commandSender.sendMessage("§7末影箱物品: §c无法解析 (" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")");
@@ -209,7 +210,7 @@ public class CheckCommand implements CommandInterface {
             } else {
                 commandSender.sendMessage("§7末影箱物品: §f无数据");
             }
-            
+
             // 显示生命值和饱食度
             if (Main.modulesManager.syncHealth) {
                 Object health = data.get("health");
@@ -217,7 +218,7 @@ public class CheckCommand implements CommandInterface {
             } else {
                 commandSender.sendMessage("§7生命值: §f未启用同步");
             }
-            
+
             if (Main.modulesManager.syncSaturation) {
                 Object saturation = data.get("saturation");
                 Object foodLevel = data.get("food_level");
@@ -247,7 +248,7 @@ public class CheckCommand implements CommandInterface {
             } else {
                 commandSender.sendMessage("§7经验: §f未启用同步");
             }
-            
+
             // 显示药水效果
             if (Main.modulesManager.syncPotionEffects) {
                 Object potionEffectsData = data.get("potion_effects");
@@ -282,9 +283,9 @@ public class CheckCommand implements CommandInterface {
             } else {
                 commandSender.sendMessage("§7药水效果: §f未启用同步");
             }
-            
+
             commandSender.sendMessage("§7========================");
-            
+
         } catch (Exception e) {
             commandSender.sendMessage("§c查询玩家数据时出错: " + e.getMessage());
             e.printStackTrace();
@@ -298,7 +299,6 @@ public class CheckCommand implements CommandInterface {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 options.add(player.getName());
             }
-            // 可以考虑添加一些最近的离线玩家
         }
         return options;
     }

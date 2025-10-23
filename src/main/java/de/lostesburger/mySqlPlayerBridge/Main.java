@@ -61,7 +61,7 @@ public final class Main extends JavaPlugin {
     public static String POTION_EFFECTS_TABLE_NAME = "mpdb_potionEffects";
 
     /**
-     * 序列化类型：使用 Minecraft NBT Base64 编码
+     * 序列化类型：仅使用 Minecraft NBT Base64 编码
      * 用于背包、装备栏、末影箱的数据编码
      */
     public static SerializationType serializationType = SerializationType.NBT_BASE64;
@@ -116,7 +116,7 @@ public final class Main extends JavaPlugin {
         config = ymlConfig.getConfig();
         prefix = config.getString("prefix");
         config.set("version", version);
-        
+
         // 确保自动备份配置项存在
         boolean configUpdated = false;
         if (!config.contains("auto-backup")) {
@@ -126,7 +126,6 @@ public final class Main extends JavaPlugin {
             this.getLogger().info("已添加自动备份配置项到config.yml");
             configUpdated = true;
         } else {
-            // 确保所有自动备份子项都存在
             if (!config.contains("auto-backup.enabled")) {
                 config.set("auto-backup.enabled", false);
                 configUpdated = true;
@@ -140,14 +139,13 @@ public final class Main extends JavaPlugin {
                 configUpdated = true;
             }
         }
-        
-        // 如果配置已更新，则保存到文件
+
         if (configUpdated) {
             ymlConfig.save();
         }
-        
-        try { 
-            config.save(new File(getInstance().getDataFolder(), "config.yml")); 
+
+        try {
+            config.save(new File(getInstance().getDataFolder(), "config.yml"));
         } catch (IOException ignored) {}
 
         SimpleConfig ymlConfigMySQL = new SimpleConfig(this, "mysql.yml");
@@ -164,14 +162,11 @@ public final class Main extends JavaPlugin {
 
         this.getLogger().log(Level.INFO, "正在检查配置更改...");
 
-        // 移除了对配置更改检查的依赖，因为 SimpleConfig 没有这个功能
-
         /**
          * Checks
          */
         this.getLogger().log(Level.INFO, "正在检查更新...");
-        // 移除了 PluginSmithsUpdateCheck，因为这是 CoreLib 的一部分
-        
+
         this.getLogger().log(Level.INFO, "正在检查数据库配置...");
 
         if(!new DatabaseConfigCheck(mysqlConf).isSetup()) {
@@ -192,10 +187,23 @@ public final class Main extends JavaPlugin {
         this.getLogger().log(Level.INFO, "物品翻译管理器加载完成");
 
         /**
-         * NBT-API
+         * NBT-API - 必须初始化
          */
-        // 总是尝试初始化NBT序列化器，无论NBTAPI插件是否存在
-        tryInitNBTSerializer();
+        this.getLogger().log(Level.WARNING, "正在初始化NBT序列化器 (必需组件)...");
+        if (!tryInitNBTSerializer()) {
+            this.getLogger().severe("╔════════════════════════════════════════════════════════╗");
+            this.getLogger().severe("║  NBT序列化器初始化失败 - 插件无法正常工作              ║");
+            this.getLogger().severe("║                                                        ║");
+            this.getLogger().severe("║  请确保已安装 NBTAPI 插件:                             ║");
+            this.getLogger().severe("║  https://www.spigotmc.org/resources/nbt-api.7939/     ║");
+            this.getLogger().severe("║                                                        ║");
+            this.getLogger().severe("║  插件将被禁用                                          ║");
+            this.getLogger().severe("╚════════════════════════════════════════════════════════╝");
+            getServer().getPluginManager().disablePlugin(this);
+            return;
+        }
+        this.getLogger().info("NBT序列化器初始化成功 ✓");
+        this.getLogger().info("物品数据将使用 NBT Base64 格式进行编码");
 
 
         /**
@@ -224,12 +232,19 @@ public final class Main extends JavaPlugin {
         playerManager = new PlayerManager();
         playerBridgeManager = new PlayerBridgeManager();
         commandManager = new CommandManager();
-        
+
         /**
          * Auto Backup Manager
          */
         autoBackupManager = new AutoBackupManager(this);
         autoBackupManager.startAutoBackup();
+
+        // 最终启动信息
+        this.getLogger().info("╔════════════════════════════════════════════════════════╗");
+        this.getLogger().info("║  MySqlPlayerBridge v" + version + " 启动完成               ║");
+        this.getLogger().info("║  序列化格式: NBT Base64                                 ║");
+        this.getLogger().info("║  数据库已连接                                           ║");
+        this.getLogger().info("╚════════════════════════════════════════════════════════╝");
     }
 
 
@@ -254,23 +269,25 @@ public final class Main extends JavaPlugin {
         }
 
         this.getLogger().log(Level.INFO, "正在停止运行中的计划任务...");
-        // 移除了对 schedulers.forEach(Scheduler.Task::cancel) 的依赖
     }
 
-    private void tryInitNBTSerializer() {
+    /**
+     * 初始化NBT序列化器 (必需)
+     * @return 是否成功初始化
+     */
+    private boolean tryInitNBTSerializer() {
         try {
             nbtSerializer = new NBTSerializer();
-            getLogger().info("NBTSerializer 初始化成功 - 使用 Minecraft NBT Base64 编码格式");
-            getLogger().info("背包、装备栏、末影箱数据将使用 NBT Base64 格式进行编码");
+            getLogger().info("NBTSerializer 初始化成功");
+            return true;
         } catch (Exception e) {
-            getLogger().severe("NBTSerializer 无法初始化:");
-            getLogger().severe("背包、装备栏、末影箱数据编码功能不可用");
+            getLogger().severe("NBTSerializer 初始化失败:");
+            getLogger().severe(e.getMessage());
             e.printStackTrace();
-            // 即使NBT序列化器初始化失败，也不要禁用插件
-            // getServer().getPluginManager().disablePlugin(this);
+            return false;
         }
     }
-    
+
     public AutoBackupManager getAutoBackupManager() {
         return autoBackupManager;
     }
