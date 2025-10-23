@@ -1,0 +1,16 @@
+# Input your Database credentials. MariaDB/MySQL databases (server) supported.
+# 请将以下配置替换为您的实际数据库连接信息
+
+host: "127.0.0.1"              # 数据库服务器地址 (例如: localhost, 127.0.0.1, 或远程服务器IP)
+port: 3306                     # 数据库端口 (默认为 3306)
+database: "mySqlPlayerBridge"  # 数据库名称
+user: "your_username"          # 数据库用户名
+password: "your_password"      # 数据库密码
+
+# Table names for multi-table structure
+inventory-table-name: "mpdb_inventory"
+enderchest-table-name: "mpdb_enderchest"
+economy-table-name: "mpdb_economy"
+experience-table-name: "mpdb_experience"
+health-food-air-table-name: "mpdb_health_food_air"
+potion-effects-table-name: "mpdb_potionEffects"

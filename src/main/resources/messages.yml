@@ -1,0 +1,41 @@
+# Message prefix can be changed in config.yml
+# Restart to apply any changes
+
+no-database-config-error: "§c请在mysql.yml配置文件中输入MySQL凭证。重启后使用此插件！"
+sync-success: "§7玩家数据§a 同步§9成功！"
+sync-failed: "§c玩家数据无法同步。请联系管理员或重新加入服务器。"
+created-data: "§7玩家数据§a 创建§9成功"
+no-entry-protection-kick: "§c启用无入口保护。§7您没有现有的玩家数据。在首次加入主服务器并获得玩家数据之前，您不能加入此服务器。如果您认为这是错误，请联系服务器管理员。"
+
+# Commands
+permission-error: "§c权限不足，无法执行此命令"
+# Placeholder <all subcommands> -> {subcomands}
+unknown-subcommand-error: "§c未知子命令。可用命令: §7<{subcommands}>"
+no-subcommand-error: "§c请提供一个子命令。可用命令: §7<{subcommands}>"
+
+# Clear subcommand
+clear-wrong-usage: "§c用法错误！请使用 clear <玩家名/*> [all/inv/end]"
+clear-player-not-found: "§c未找到玩家。该玩家不存在。删除失败..."
+
+# Check subcommand
+check-wrong-usage: "§c用法错误！请使用 check <玩家名/UUID>"
+
+# Reload subcommand
+reload-success: "§a配置文件已重新加载！"
+
+# Export subcommand
+export-starting: "§7正在导出数据库备份..."
+export-success: "§a数据库备份导出成功！文件路径: §7{file}"
+export-failed: "§c数据库备份导出失败: §7{error}"
+
+# Import subcommand
+import-usage: "§c用法错误！请使用 import <文件名>"
+import-file-not-found: "§c找不到备份文件: §7{file}"
+import-starting: "§7正在从文件导入数据库备份: §7{file}"
+import-success: "§a数据库备份导入成功！导入了 §7{count} §a条记录"
+import-failed: "§c数据库备份导入失败: §7{error}"
+
+# Backup subcommand
+backup-started: "§a自动备份已启用"
+backup-stopped: "§c自动备份已停止"
+backup-starting-now: "§7正在执行立即备份..."

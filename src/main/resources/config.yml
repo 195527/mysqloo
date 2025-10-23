@@ -1,0 +1,64 @@
+# 插件前缀，支持颜色代码和RGB
+prefix: "§7[§9MPB§7]§r "
+# 查看已安装的版本。在请求支持时请提供此版本，并始终检查最新版本。
+version: ""
+
+settings:
+  # 更改根命令（默认为 /mpb <子命令>）
+  command-prefix: "mpb"
+  # 如果由于任何原因同步失败，插件将尝试再次保存。如果同步再次失败，玩家将被踢出，其数据将被打印并保存在插件目录的文件中。
+  kickPlayerOnSyncFail: true
+
+  # 仅在您拥有现有服务器且已保存玩家数据时重要
+  # 重要：如果您在已有保存玩家数据的现有服务器上部署此插件，
+  # 可能会发生保存错误服务器数据的情况。
+  # 例如，玩家在服务器1上有重要数据，但在服务器2上没有（例如农场世界）。
+  # 如果玩家先加入服务器1，一切正常——数据在数据库中创建并传输到服务器2。
+  # 但是，如果玩家先加入服务器2，在服务器1的数据保存之前，
+  # 空数据将被保存并传回服务器1，有效地删除原始数据。
+  # 为避免此问题，您可以启用下面的"无入口保护"。
+  # 仅在不应被视为默认玩家数据源的服务器上将其设置为true
+  # （在此示例中：server2 = true，server1 = false）。
+  # 如果启用此选项且玩家在没有现有数据的情况下加入（对于所有启用的同步模块），
+  # 连接将被拒绝且不会保存任何数据。
+  no-entry-protection: false
+
+  # 执行管理命令所需的权限
+  admin-permission: "mbp.admin"
+
+# 自动备份设置
+auto-backup:
+  # 是否启用自动备份
+  enabled: false
+  # 备份间隔（分钟）
+  interval: 60
+  # 保留的备份文件数量（0表示不限制）
+  keep-count: 10
+
+sync:
+  # 同步玩家背包
+  inventory: false
+  # 同步玩家末ender箱
+  enderChest: false
+  # 同步玩家装备槽位
+  amorSlots: false
+  # 同步玩家位置
+  location: false
+  # 同步玩家游戏模式
+  gamemode: false
+  # 同步玩家经验值
+  exp: false
+  # 同步玩家生命值
+  health: false
+  # 同步玩家饱和度
+  saturation: false
+  # 此插件仅支持Vault作为经济管理器。
+  # 在启用此模块之前，请确保已安装Vault（https://www.spigotmc.org/resources/vault.34315/）。
+  vaultEconomy: false
+  # 同步玩家药水效果
+  potionEffects: false
+
+# 创建一个自动运行的任务，每隔指定时间保存所有在线玩家的背包。
+syncTask:
+  # 延迟时间（秒）
+  delay: 1

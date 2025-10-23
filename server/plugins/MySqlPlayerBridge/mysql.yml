@@ -1,0 +1,16 @@
+# Input your Database credentials. MariaDB/MySQL databases (server) supported.
+# 请将以下配置替换为您的实际数据库连接信息
+
+host: "10.10.10.10"              # 数据库服务器地址
+port: 33520                     # 数据库端口 (默认为 3306)
+database: "root"  # 数据库名称
+user: "yqf5271314"   # 数据库用户名 (注意：去掉了末尾的点号)
+password: "your_actual_password" # 数据库密码 (请替换为实际密码)
+
+# Table names for multi-table structure
+inventory-table-name: "mpdb_inventory"
+enderchest-table-name: "mpdb_enderchest"
+economy-table-name: "mpdb_economy"
+experience-table-name: "mpdb_experience"
+health-food-air-table-name: "mpdb_health_food_air"
+potion-effects-table-name: "mpdb_potionEffects"

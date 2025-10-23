@@ -1,0 +1,72 @@
+# MySqlPlayerBridge 插件命令说明
+# 该文件描述了插件中所有可用的命令及其功能
+
+# 主命令 - /mpb
+# 这是插件的根命令，所有主要功能都通过此命令的子命令访问
+/mpb:
+  # 清除玩家数据命令
+  clear:
+    description: "清除指定玩家的数据"
+    usage: "/mpb clear <玩家名|*> [all|inv|end]"
+    permission: "mbp.admin"
+    details:
+      - "玩家名 - 指定要清除数据的玩家名称"
+      - "* - 清除所有玩家的数据"
+      - "all - 清除所有数据（默认）"
+      - "inv - 只清除物品栏数据"
+      - "end - 只清除末影箱数据"
+
+  # 检查玩家数据命令
+  check:
+    description: "检查指定玩家的数据库存储数据"
+    usage: "/mpb check <玩家名|UUID>"
+    permission: "mbp.admin"
+    details:
+      - "玩家名 - 要检查的玩家名称"
+      - "UUID - 要检查的玩家UUID"
+
+  # 重新加载配置命令
+  reload:
+    description: "重新加载插件配置文件"
+    usage: "/mpb reload"
+    permission: "mbp.admin"
+
+  # 导出数据库命令
+  export:
+    description: "将数据库内容导出为SQL备份文件"
+    usage: "/mpb export"
+    permission: "mbp.admin"
+
+  # 导入数据库命令
+  import:
+    description: "从SQL备份文件导入数据库内容"
+    usage: "/mpb import <文件名>"
+    permission: "mbp.admin"
+    details:
+      - "文件名 - 位于插件数据文件夹中的备份文件名"
+      
+  # 备份命令
+  backup:
+    description: "控制自动备份功能"
+    usage: "/mpb backup <start|stop|status|now>"
+    permission: "mbp.admin"
+    subcommands:
+      start:
+        description: "启用自动备份功能"
+        usage: "/mpb backup start"
+      stop:
+        description: "停止自动备份功能"
+        usage: "/mpb backup stop"
+      status:
+        description: "查看自动备份功能的状态信息"
+        usage: "/mpb backup status"
+      now:
+        description: "立即执行一次数据库备份"
+        usage: "/mpb backup now"
+
+# 配置文件说明
+# 自动备份配置在 config.yml 文件中:
+# auto-backup:
+#   enabled: false      # 是否启用自动备份
+#   interval: 60        # 备份间隔（分钟）
+#   keep-count: 10      # 保留的备份文件数量（0表示不限制）
