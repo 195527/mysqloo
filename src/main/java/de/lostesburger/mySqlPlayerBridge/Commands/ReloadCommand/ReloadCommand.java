@@ -42,6 +42,9 @@ public class ReloadCommand implements CommandInterface {
             // 重新初始化模块管理器
             Main.modulesManager = new ModulesManager();
 
+            // 重新初始化存储管理器
+            ((Main) Main.getInstance()).initializeStorageManager();
+
             // 重新保存配置
             try {
                 Main.config.set("version", Main.version);

@@ -8,6 +8,7 @@ import de.lostesburger.mySqlPlayerBridge.Database.DatabaseManager;
 import de.lostesburger.mySqlPlayerBridge.Handlers.Errors.MySqlErrorHandler;
 import de.lostesburger.mySqlPlayerBridge.Main;
 import de.lostesburger.mySqlPlayerBridge.Managers.Modules.ModulesManager;
+import de.lostesburger.mySqlPlayerBridge.Storage.StorageManager;
 import de.lostesburger.mySqlPlayerBridge.Utils.Chat;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -26,13 +27,14 @@ import java.util.List;
 import java.util.ArrayList;
 
 import java.sql.SQLException;
+import java.io.IOException;
 
 
 public class MySqlDataManager {
-    public final DatabaseManager databaseManager;
+    public final StorageManager storageManager;
 
-    public MySqlDataManager(DatabaseManager manager){
-        databaseManager = manager;
+    public MySqlDataManager(StorageManager storageManager){
+        this.storageManager = storageManager;
     }
 
     public boolean hasData(Player player){
@@ -42,12 +44,12 @@ public class MySqlDataManager {
                 System.out.println("Checking if player has data! Player: "+player.getName());
             }
             // Check if player exists in any of the tables
-            return this.databaseManager.entryExists(Main.INVENTORY_TABLE_NAME, Map.of("player_uuid", uuid.toString())) ||
-                    this.databaseManager.entryExists(Main.ENDERCHEST_TABLE_NAME, Map.of("player_uuid", uuid.toString())) ||
-                    this.databaseManager.entryExists(Main.ECONOMY_TABLE_NAME, Map.of("player_uuid", uuid.toString())) ||
-                    this.databaseManager.entryExists(Main.EXPERIENCE_TABLE_NAME, Map.of("player_uuid", uuid.toString())) ||
-                    this.databaseManager.entryExists(Main.HEALTH_FOOD_AIR_TABLE_NAME, Map.of("player_uuid", uuid.toString())) ||
-                    this.databaseManager.entryExists(Main.POTION_EFFECTS_TABLE_NAME, Map.of("player_uuid", uuid.toString()));
+            return this.storageManager.entryExists(Main.INVENTORY_TABLE_NAME, Map.of("player_uuid", uuid.toString())) ||
+                    this.storageManager.entryExists(Main.ENDERCHEST_TABLE_NAME, Map.of("player_uuid", uuid.toString())) ||
+                    this.storageManager.entryExists(Main.ECONOMY_TABLE_NAME, Map.of("player_uuid", uuid.toString())) ||
+                    this.storageManager.entryExists(Main.EXPERIENCE_TABLE_NAME, Map.of("player_uuid", uuid.toString())) ||
+                    this.storageManager.entryExists(Main.HEALTH_FOOD_AIR_TABLE_NAME, Map.of("player_uuid", uuid.toString())) ||
+                    this.storageManager.entryExists(Main.POTION_EFFECTS_TABLE_NAME, Map.of("player_uuid", uuid.toString()));
         } catch (SQLException e) {
             new MySqlErrorHandler().hasPlayerData(player);
             throw new RuntimeException(e);
@@ -61,7 +63,7 @@ public class MySqlDataManager {
         double health = player.getHealth();
         float saturation = player.getSaturation();
         double money = 0.0;
-        if(Main.modulesManager.syncVaultEconomy){
+        if(Main.modulesManager.syncVaultEconomy && Main.vaultManager != null){
             money = Main.vaultManager.getBalance(player);
         }
 
@@ -109,32 +111,27 @@ public class MySqlDataManager {
         String serializedEnderChest;
         String serializedArmor;
         try {
-            // 检查NBT序列化器是否可用
-            if (Main.nbtSerializer == null) {
-                throw new RuntimeException("NBT序列化器未初始化。插件无法正常工作。");
+            // 检查YAML序列化器是否可用
+            if (Main.yamlSerializer == null) {
+                throw new RuntimeException("YAML序列化器未初始化。插件无法正常工作。");
             }
 
-            // 使用NBT格式序列化
-            serializedInventory = Main.nbtSerializer.serialize(player.getInventory().getContents());
-            serializedEnderChest = Main.nbtSerializer.serialize(player.getEnderChest().getContents());
+            // 使用YAML格式序列化整个物品栏（包括盔甲槽和副手槽）
+            serializedInventory = Main.yamlSerializer.serialize(player.getInventory().getContents());
+            serializedEnderChest = Main.yamlSerializer.serialize(player.getEnderChest().getContents());
 
-            ItemStack[] armorContents = new ItemStack[]{
-                    player.getInventory().getBoots(),
-                    player.getInventory().getLeggings(),
-                    player.getInventory().getChestplate(),
-                    player.getInventory().getHelmet()
-            };
-            serializedArmor = Main.nbtSerializer.serialize(armorContents);
+            // 不再单独序列化盔甲槽，因为已经包含在完整的物品栏中了
+            serializedArmor = ""; // 保留此字段以保持数据库兼容性，但留空
 
             if(Main.DEBUG){
-                System.out.println("使用NBT格式序列化物品数据");
+                System.out.println("使用YAML格式序列化物品数据");
                 System.out.println("Inv前50字符: " + serializedInventory.substring(0, Math.min(50, serializedInventory.length())) + "...");
                 System.out.println("EnderChest前50字符: " + serializedEnderChest.substring(0, Math.min(50, serializedEnderChest.length())) + "...");
                 System.out.println("Armor前50字符: " + serializedArmor.substring(0, Math.min(50, serializedArmor.length())) + "...");
             }
         } catch (Exception e) {
             Main.getInstance().getLogger().severe("序列化玩家物品时出错: " + e.getMessage());
-            Main.getInstance().getLogger().severe("请确保NBTAPI插件已正确安装并加载");
+            Main.getInstance().getLogger().severe("请确保序列化器已正确初始化");
             e.printStackTrace();
             throw new RuntimeException("物品序列化失败", e);
         }
@@ -168,7 +165,7 @@ public class MySqlDataManager {
             inventoryData.put("sync_complete", "true");
             inventoryData.put("last_seen", currentTime);
 
-            this.databaseManager.setOrUpdateEntry(Main.INVENTORY_TABLE_NAME,
+            this.storageManager.setOrUpdateEntry(Main.INVENTORY_TABLE_NAME,
                     Map.of("player_uuid", uuid.toString()), inventoryData);
 
             // Save enderchest data
@@ -179,7 +176,7 @@ public class MySqlDataManager {
             enderchestData.put("sync_complete", "true");
             enderchestData.put("last_seen", currentTime);
 
-            this.databaseManager.setOrUpdateEntry(Main.ENDERCHEST_TABLE_NAME,
+            this.storageManager.setOrUpdateEntry(Main.ENDERCHEST_TABLE_NAME,
                     Map.of("player_uuid", uuid.toString()), enderchestData);
 
             // Save economy data
@@ -191,7 +188,7 @@ public class MySqlDataManager {
             economyData.put("sync_complete", "true");
             economyData.put("last_seen", currentTime);
 
-            this.databaseManager.setOrUpdateEntry(Main.ECONOMY_TABLE_NAME,
+            this.storageManager.setOrUpdateEntry(Main.ECONOMY_TABLE_NAME,
                     Map.of("player_uuid", uuid.toString()), economyData);
 
             // Save experience data
@@ -205,7 +202,7 @@ public class MySqlDataManager {
             experienceData.put("sync_complete", "true");
             experienceData.put("last_seen", currentTime);
 
-            this.databaseManager.setOrUpdateEntry(Main.EXPERIENCE_TABLE_NAME,
+            this.storageManager.setOrUpdateEntry(Main.EXPERIENCE_TABLE_NAME,
                     Map.of("player_uuid", uuid.toString()), experienceData);
 
             // Save health/food/air data
@@ -222,7 +219,7 @@ public class MySqlDataManager {
             healthData.put("sync_complete", "true");
             healthData.put("last_seen", currentTime);
 
-            this.databaseManager.setOrUpdateEntry(Main.HEALTH_FOOD_AIR_TABLE_NAME,
+            this.storageManager.setOrUpdateEntry(Main.HEALTH_FOOD_AIR_TABLE_NAME,
                     Map.of("player_uuid", uuid.toString()), healthData);
 
             // Save potion effects data
@@ -233,7 +230,7 @@ public class MySqlDataManager {
             potionData.put("sync_complete", "true");
             potionData.put("last_seen", currentTime);
 
-            this.databaseManager.setOrUpdateEntry(Main.POTION_EFFECTS_TABLE_NAME,
+            this.storageManager.setOrUpdateEntry(Main.POTION_EFFECTS_TABLE_NAME,
                     Map.of("player_uuid", uuid.toString()), potionData);
 
         } catch (SQLException e) {
@@ -258,37 +255,37 @@ public class MySqlDataManager {
 
             // Get inventory data
             try {
-                HashMap<String, Object> inventoryData = (HashMap<String, Object>) this.databaseManager.getEntry(Main.INVENTORY_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
+                HashMap<String, Object> inventoryData = (HashMap<String, Object>) this.storageManager.getEntry(Main.INVENTORY_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
                 if (inventoryData != null) mergedData.putAll(inventoryData);
             } catch (SQLException ignored) {}
 
             // Get enderchest data
             try {
-                HashMap<String, Object> enderchestData = (HashMap<String, Object>) this.databaseManager.getEntry(Main.ENDERCHEST_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
+                HashMap<String, Object> enderchestData = (HashMap<String, Object>) this.storageManager.getEntry(Main.ENDERCHEST_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
                 if (enderchestData != null) mergedData.putAll(enderchestData);
             } catch (SQLException ignored) {}
 
             // Get economy data
             try {
-                HashMap<String, Object> economyData = (HashMap<String, Object>) this.databaseManager.getEntry(Main.ECONOMY_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
+                HashMap<String, Object> economyData = (HashMap<String, Object>) this.storageManager.getEntry(Main.ECONOMY_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
                 if (economyData != null) mergedData.putAll(economyData);
             } catch (SQLException ignored) {}
 
             // Get experience data
             try {
-                HashMap<String, Object> experienceData = (HashMap<String, Object>) this.databaseManager.getEntry(Main.EXPERIENCE_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
+                HashMap<String, Object> experienceData = (HashMap<String, Object>) this.storageManager.getEntry(Main.EXPERIENCE_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
                 if (experienceData != null) mergedData.putAll(experienceData);
             } catch (SQLException ignored) {}
 
             // Get health/food/air data
             try {
-                HashMap<String, Object> healthData = (HashMap<String, Object>) this.databaseManager.getEntry(Main.HEALTH_FOOD_AIR_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
+                HashMap<String, Object> healthData = (HashMap<String, Object>) this.storageManager.getEntry(Main.HEALTH_FOOD_AIR_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
                 if (healthData != null) mergedData.putAll(healthData);
             } catch (SQLException ignored) {}
 
             // Get potion effects data
             try {
-                HashMap<String, Object> potionData = (HashMap<String, Object>) this.databaseManager.getEntry(Main.POTION_EFFECTS_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
+                HashMap<String, Object> potionData = (HashMap<String, Object>) this.storageManager.getEntry(Main.POTION_EFFECTS_TABLE_NAME, Map.of("player_uuid", player.getUniqueId().toString()));
                 if (potionData != null) mergedData.putAll(potionData);
             } catch (SQLException ignored) {}
 
@@ -299,7 +296,7 @@ public class MySqlDataManager {
         }
     }
 
-    public boolean checkDatabaseConnection(){ return databaseManager.isConnectionAlive(); }
+    public boolean checkDatabaseConnection(){ return storageManager.isConnectionAlive(); }
 
     public void applyDataToPlayer(Player player){
         if(Main.DEBUG){
@@ -316,12 +313,32 @@ public class MySqlDataManager {
                     if (data.containsKey("inventory")) {
                         String inventoryData = String.valueOf(data.get("inventory"));
                         if (inventoryData != null && !inventoryData.isEmpty()) {
-                            // 使用NBT反序列化
-                            if (Main.nbtSerializer == null) {
-                                throw new RuntimeException("NBT序列化器未初始化");
+                            // 使用YAML反序列化
+                            if (Main.yamlSerializer == null) {
+                                throw new RuntimeException("YAML序列化器未初始化");
                             }
-                            ItemStack[] inventoryContents = Main.nbtSerializer.deserialize(inventoryData);
-                            player.getInventory().setContents(inventoryContents);
+                            ItemStack[] inventoryContents = Main.yamlSerializer.deserialize(inventoryData);
+                            
+                            // 检查是否成功反序列化了物品
+                            if (inventoryContents != null && inventoryContents.length > 0) {
+                                // 检查是否包含非空物品
+                                boolean hasNonNullItems = false;
+                                for (ItemStack item : inventoryContents) {
+                                    if (item != null) {
+                                        hasNonNullItems = true;
+                                        break;
+                                    }
+                                }
+                                
+                                if (hasNonNullItems) {
+                                    player.getInventory().setContents(inventoryContents);
+                                    Main.getInstance().getLogger().info("成功加载玩家 " + player.getName() + " 的背包数据，包含 " + inventoryContents.length + " 个槽位");
+                                } else {
+                                    Main.getInstance().getLogger().warning("背包数据反序列化结果全为空物品");
+                                }
+                            } else {
+                                Main.getInstance().getLogger().warning("背包数据反序列化结果为空或长度为0");
+                            }
                         } else {
                             Main.getInstance().getLogger().warning("背包数据为空，跳过加载");
                         }
@@ -339,11 +356,11 @@ public class MySqlDataManager {
                     if (data.containsKey("enderchest")) {
                         String enderChestData = String.valueOf(data.get("enderchest"));
                         if (enderChestData != null && !enderChestData.isEmpty()) {
-                            // 使用NBT反序列化
-                            if (Main.nbtSerializer == null) {
-                                throw new RuntimeException("NBT序列化器未初始化");
+                            // 使用YAML反序列化
+                            if (Main.yamlSerializer == null) {
+                                throw new RuntimeException("YAML序列化器未初始化");
                             }
-                            ItemStack[] enderChestContents = Main.nbtSerializer.deserialize(enderChestData);
+                            ItemStack[] enderChestContents = Main.yamlSerializer.deserialize(enderChestData);
                             player.getEnderChest().setContents(enderChestContents);
                         } else {
                             Main.getInstance().getLogger().warning("末影箱数据为空，跳过加载");
@@ -351,29 +368,6 @@ public class MySqlDataManager {
                     }
                 } catch (Exception e) {
                     Main.getInstance().getLogger().severe("无法反序列化玩家末影箱数据: " + e.getMessage());
-                    e.printStackTrace();
-                    player.kickPlayer(Chat.getMessage("sync-failed"));
-                    throw new RuntimeException(e);
-                }
-            }
-
-            if(modules.syncArmorSlots){
-                try {
-                    if (data.containsKey("armor")) {
-                        String armorData = String.valueOf(data.get("armor"));
-                        if (armorData != null && !armorData.isEmpty()) {
-                            // 使用NBT反序列化
-                            if (Main.nbtSerializer == null) {
-                                throw new RuntimeException("NBT序列化器未初始化");
-                            }
-                            ItemStack[] armorContents = Main.nbtSerializer.deserialize(armorData);
-                            player.getInventory().setArmorContents(armorContents);
-                        } else {
-                            Main.getInstance().getLogger().warning("装备数据为空，跳过加载");
-                        }
-                    }
-                } catch (Exception e) {
-                    Main.getInstance().getLogger().severe("无法反序列化玩家装备数据: " + e.getMessage());
                     e.printStackTrace();
                     player.kickPlayer(Chat.getMessage("sync-failed"));
                     throw new RuntimeException(e);
@@ -406,7 +400,16 @@ public class MySqlDataManager {
                     if (healthObj instanceof String) {
                         health = Double.parseDouble((String) healthObj);
                     } else {
-                        health = (Double) healthObj;
+                        // 修复类型转换错误：确保正确处理各种数字类型
+                        if (healthObj instanceof Double) {
+                            health = (Double) healthObj;
+                        } else if (healthObj instanceof Float) {
+                            health = ((Float) healthObj).doubleValue();
+                        } else if (healthObj instanceof Integer) {
+                            health = ((Integer) healthObj).doubleValue();
+                        } else {
+                            throw new IllegalArgumentException("Cannot convert " + healthObj.getClass() + " to Double");
+                        }
                     }
                     player.setHealth(health);
                 }
@@ -419,7 +422,8 @@ public class MySqlDataManager {
                     if (saturationObj instanceof String) {
                         saturation = Float.parseFloat((String) saturationObj);
                     } else {
-                        saturation = (Float) saturationObj;
+                        // 修复类型转换错误：使用convertToFloat方法处理各种数字类型
+                        saturation = convertToFloat(saturationObj);
                     }
                     player.setSaturation(saturation);
                 }
@@ -453,13 +457,22 @@ public class MySqlDataManager {
             }
 
             if(modules.syncVaultEconomy){
-                if (data.containsKey("money")) {
+                if (Main.vaultManager != null && data.containsKey("money")) {
                     Object moneyObj = data.get("money");
                     Double money;
                     if (moneyObj instanceof String) {
                         money = Double.parseDouble((String) moneyObj);
                     } else {
-                        money = (Double) moneyObj;
+                        // 修复类型转换错误：确保正确处理各种数字类型
+                        if (moneyObj instanceof Double) {
+                            money = (Double) moneyObj;
+                        } else if (moneyObj instanceof Float) {
+                            money = ((Float) moneyObj).doubleValue();
+                        } else if (moneyObj instanceof Integer) {
+                            money = ((Integer) moneyObj).doubleValue();
+                        } else {
+                            throw new IllegalArgumentException("Cannot convert " + moneyObj.getClass() + " to Double");
+                        }
                     }
                     Main.vaultManager.setBalance(player, money);
                 }
@@ -472,7 +485,8 @@ public class MySqlDataManager {
                     if (expObj instanceof String) {
                         exp = Float.parseFloat((String) expObj);
                     } else {
-                        exp = (Float) expObj;
+                        // 修复类型转换错误：使用convertToFloat方法处理各种数字类型
+                        exp = convertToFloat(expObj);
                     }
                     player.setExp(exp);
                     player.setLevel((Integer) data.get("exp_level"));
@@ -491,19 +505,46 @@ public class MySqlDataManager {
                     if (xObj instanceof String) {
                         x = Double.parseDouble((String) xObj);
                     } else {
-                        x = (Double) xObj;
+                        // 修复类型转换错误：确保正确处理各种数字类型
+                        if (xObj instanceof Double) {
+                            x = (Double) xObj;
+                        } else if (xObj instanceof Float) {
+                            x = ((Float) xObj).doubleValue();
+                        } else if (xObj instanceof Integer) {
+                            x = ((Integer) xObj).doubleValue();
+                        } else {
+                            throw new IllegalArgumentException("Cannot convert " + xObj.getClass() + " to Double");
+                        }
                     }
 
                     if (yObj instanceof String) {
                         y = Double.parseDouble((String) yObj);
                     } else {
-                        y = (Double) yObj;
+                        // 修复类型转换错误：确保正确处理各种数字类型
+                        if (yObj instanceof Double) {
+                            y = (Double) yObj;
+                        } else if (yObj instanceof Float) {
+                            y = ((Float) yObj).doubleValue();
+                        } else if (yObj instanceof Integer) {
+                            y = ((Integer) yObj).doubleValue();
+                        } else {
+                            throw new IllegalArgumentException("Cannot convert " + yObj.getClass() + " to Double");
+                        }
                     }
 
                     if (zObj instanceof String) {
                         z = Double.parseDouble((String) zObj);
                     } else {
-                        z = (Double) zObj;
+                        // 修复类型转换错误：确保正确处理各种数字类型
+                        if (zObj instanceof Double) {
+                            z = (Double) zObj;
+                        } else if (zObj instanceof Float) {
+                            z = ((Float) zObj).doubleValue();
+                        } else if (zObj instanceof Integer) {
+                            z = ((Integer) zObj).doubleValue();
+                        } else {
+                            throw new IllegalArgumentException("Cannot convert " + zObj.getClass() + " to Double");
+                        }
                     }
 
                     Location location = new Location(world, x, y, z,

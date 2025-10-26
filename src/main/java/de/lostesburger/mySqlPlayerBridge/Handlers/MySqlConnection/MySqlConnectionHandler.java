@@ -4,6 +4,7 @@ import de.lostesburger.mySqlPlayerBridge.Database.DatabaseManager;
 import de.lostesburger.mySqlPlayerBridge.Handlers.Errors.MySqlErrorHandler;
 import de.lostesburger.mySqlPlayerBridge.Main;
 import de.lostesburger.mySqlPlayerBridge.Managers.MySqlData.MySqlDataManager;
+import de.lostesburger.mySqlPlayerBridge.Storage.MySQLStorageManager;
 
 import java.sql.SQLException;
 
@@ -20,7 +21,9 @@ public class MySqlConnectionHandler {
         }
         createTables();
 
-        this.mySqlDataManager = new MySqlDataManager(databaseManager);
+        // 修复：创建MySQLStorageManager并传递给MySqlDataManager
+        MySQLStorageManager storageManager = new MySQLStorageManager(this.databaseManager);
+        this.mySqlDataManager = new MySqlDataManager(storageManager);
     }
 
     private void createTables() {

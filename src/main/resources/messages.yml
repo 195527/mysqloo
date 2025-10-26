@@ -23,6 +23,9 @@ check-wrong-usage: "§c用法错误！请使用 check <玩家名/UUID>"
 # Reload subcommand
 reload-success: "§a配置文件已重新加载！"
 
+# SQL Reload subcommand
+sql-reload-success: "§a存储管理器已重新加载！当前存储类型: §7{type}§a"
+
 # Export subcommand
 export-starting: "§7正在导出数据库备份..."
 export-success: "§a数据库备份导出成功！文件路径: §7{file}"

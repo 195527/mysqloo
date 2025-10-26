@@ -19,7 +19,12 @@ public class PlayerBridgeManager implements Listener {
     public PlayerBridgeManager(){
         Bukkit.getPluginManager().registerEvents(this, Main.getInstance());
         this.startAutoSyncTask();
-        this.mySqlDataManager = Main.mySqlConnectionHandler.getMySqlDataManager();
+        // 修复：检查mySqlConnectionHandler是否为null，如果不为null则使用它，否则使用storageManager创建DataManager
+        if (Main.mySqlConnectionHandler != null) {
+            this.mySqlDataManager = Main.mySqlConnectionHandler.getMySqlDataManager();
+        } else {
+            this.mySqlDataManager = new MySqlDataManager(Main.storageManager);
+        }
     }
 
     @EventHandler(priority = EventPriority.HIGHEST)
@@ -48,8 +53,14 @@ public class PlayerBridgeManager implements Listener {
     private void startAutoSyncTask(){
         assert this.mySqlDataManager != null;
         autoSyncTask = Bukkit.getScheduler().runTaskTimerAsynchronously(Main.getInstance(), () -> {
-            Main.mySqlConnectionHandler.getMySqlDataManager().saveAllOnlinePlayersAsync();
-        }, 20, 20); // 每秒同步一次，提高实时性
+            // 修复：检查mySqlConnectionHandler是否为null
+            if (Main.mySqlConnectionHandler != null) {
+                Main.mySqlConnectionHandler.getMySqlDataManager().saveAllOnlinePlayersAsync();
+            } else {
+                // 对于非MySQL存储，直接使用mySqlDataManager
+                this.mySqlDataManager.saveAllOnlinePlayersAsync();
+            }
+        }, 20, Main.modulesManager.syncTaskDelay); // 使用配置文件中的同步延迟值，而不是硬编码
         
         Main.schedulers.add(() -> autoSyncTask.cancel());
     }

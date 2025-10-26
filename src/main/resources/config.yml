@@ -1,7 +1,17 @@
 # 插件前缀，支持颜色代码和RGB
 prefix: "§7[§9MPB§7]§r "
 # 查看已安装的版本。在请求支持时请提供此版本，并始终检查最新版本。
-version: ""
+version: "3.2.1"
+
+# 是否启用GZIP压缩，默认为false
+enable-gzip-compression: false
+
+# 存储方式配置
+# 可选值: "mysql", "sqlite", "yaml"
+# mysql: 使用MySQL数据库存储数据（需要配置mysql.yml）
+# sqlite: 使用本地SQLite数据库存储数据（文件位于插件目录下）
+# yaml: 使用YAML文件存储数据（所有数据存储在插件目录的yaml_bak文件夹下）
+storage-type: "mysql"
 
 settings:
   # 更改根命令（默认为 /mpb <子命令>）
@@ -36,12 +46,10 @@ auto-backup:
   keep-count: 10
 
 sync:
-  # 同步玩家背包
+  # 同步玩家背包（包括物品栏、盔甲槽和副手槽）
   inventory: false
   # 同步玩家末ender箱
   enderChest: false
-  # 同步玩家装备槽位
-  amorSlots: false
   # 同步玩家位置
   location: false
   # 同步玩家游戏模式

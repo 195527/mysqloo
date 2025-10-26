@@ -48,7 +48,20 @@ public class ImportCommand implements CommandInterface {
         MySqlDataManager dataManager = Main.mySqlConnectionHandler.getMySqlDataManager();
         Connection connection = null;
         try {
-            connection = dataManager.databaseManager.getConnection();
+            // 修复：使用正确的存储管理器获取连接
+            if (Main.storageManager != null && Main.storageManager instanceof de.lostesburger.mySqlPlayerBridge.Storage.MySQLStorageManager) {
+                // 如果是MySQL存储，尝试获取连接
+                connection = ((de.lostesburger.mySqlPlayerBridge.Database.DatabaseManager) 
+                    ((de.lostesburger.mySqlPlayerBridge.Storage.MySQLStorageManager) Main.storageManager).getClass()
+                    .getDeclaredField("databaseManager").get(Main.storageManager))
+                    .getConnection();
+            } else {
+                // 默认方式获取连接
+                java.lang.reflect.Field databaseManagerField = dataManager.getClass().getDeclaredField("storageManager");
+                databaseManagerField.setAccessible(true);
+                DatabaseManager databaseManager = (DatabaseManager) databaseManagerField.get(dataManager);
+                connection = databaseManager.getConnection();
+            }
         } catch (Exception e) {
             commandSender.sendMessage(Chat.getMessage("import-failed").replace("{error}", "数据库连接失败: " + e.getMessage()));
             e.printStackTrace();

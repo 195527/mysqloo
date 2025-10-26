@@ -10,6 +10,8 @@ import de.lostesburger.mySqlPlayerBridge.Commands.ReloadCommand.ReloadCommand;
 import de.lostesburger.mySqlPlayerBridge.Commands.ExportCommand.ExportCommand;
 import de.lostesburger.mySqlPlayerBridge.Commands.ImportCommand.ImportCommand;
 import de.lostesburger.mySqlPlayerBridge.Commands.BackupCommand.BackupCommand;
+import de.lostesburger.mySqlPlayerBridge.Commands.SQLReloadCommand.SQLReloadCommand;
+import de.lostesburger.mySqlPlayerBridge.Commands.SQLReloadCommand.SQLCommand;
 import de.lostesburger.mySqlPlayerBridge.Main;
 import de.lostesburger.mySqlPlayerBridge.Utils.Chat;
 import org.bukkit.command.CommandSender;
@@ -30,6 +32,7 @@ public class MPBCommand implements CommandInterface {
         subCommandManager.addSubCommand("export", new ExportCommand());
         subCommandManager.addSubCommand("import", new ImportCommand());
         subCommandManager.addSubCommand("backup", new BackupCommand());
+        subCommandManager.addSubCommand("sql", new SQLCommand());
     }
 
     @Override

@@ -74,12 +74,14 @@
             <scope>provided</scope>
         </dependency>
 
-        <!-- Item-NBT-API - 跨版本 NBT 支持库 (1.8-1.21) -->
+        <!-- ===== NBT-API 修改为外部依赖 ===== -->
         <dependency>
             <groupId>de.tr7zw</groupId>
-            <artifactId>item-nbt-api</artifactId>
-            <version>2.12.4</version>
+            <artifactId>item-nbt-api-plugin</artifactId>
+            <version>2.15.3</version>
+            <scope>provided</scope>
         </dependency>
+        <!-- ========================== -->
 
         <!-- MySQL Connector -->
         <dependency>
@@ -108,6 +110,14 @@
             <groupId>com.google.code.gson</groupId>
             <artifactId>gson</artifactId>
             <version>2.10.1</version>
+        </dependency>
+
+        <!-- SQLite JDBC -->
+        <dependency>
+            <groupId>org.xerial</groupId>
+            <artifactId>sqlite-jdbc</artifactId>
+            <version>3.42.0.0</version>
+            <scope>compile</scope>
         </dependency>
     </dependencies>
 
@@ -142,11 +152,6 @@
                         <configuration>
                             <createDependencyReducedPom>true</createDependencyReducedPom>
                             <relocations>
-                                <!-- 重定位 NBT-API 避免冲突 -->
-                                <relocation>
-                                    <pattern>de.tr7zw.changeme.nbtapi</pattern>
-                                    <shadedPattern>de.lostesburger.mySqlPlayerBridge.libs.nbtapi</shadedPattern>
-                                </relocation>
                                 <!-- 重定位 HikariCP -->
                                 <relocation>
                                     <pattern>com.zaxxer.hikari</pattern>
@@ -156,6 +161,11 @@
                                 <relocation>
                                     <pattern>com.google.gson</pattern>
                                     <shadedPattern>de.lostesburger.mySqlPlayerBridge.libs.gson</shadedPattern>
+                                </relocation>
+                                <!-- 重定位 SQLite JDBC -->
+                                <relocation>
+                                    <pattern>org.sqlite</pattern>
+                                    <shadedPattern>de.lostesburger.mySqlPlayerBridge.libs.sqlite</shadedPattern>
                                 </relocation>
                             </relocations>
                             <filters>
